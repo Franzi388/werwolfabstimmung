@@ -151,7 +151,10 @@ function renderNarratorGuide(){loadNarratorNotes();const signature=JSON.stringif
 for(const [key,id,label] of [['healUsed','heal','Heiltrank'],['poisonUsed','poison','Gifttrank']]){const used=narratorNotes[key];$(id+'State').textContent=used?'Verbraucht':'Verfügbar';$(id+'State').className=used?'potionUsed':'potionReady';$(id+'Toggle').textContent=used?label+' zurücksetzen':label+' verwenden'}
 }
 function guideAction(id,fn){const button=$(id);button.onclick=()=>{if(button.disabled)return;const context=JSON.stringify(narratorNotes);if(!guideArmed||guideArmed.id!==id||guideArmed.context!==context){if(guideArmed){const previous=$(guideArmed.id);previous.classList.remove('tapArmed');previous.textContent=guideArmed.label}guideArmed={id,context,label:button.textContent};button.classList.remove('tapSaved');button.classList.add('tapArmed');button.textContent+=' · Noch einmal tippen';return}button.textContent=guideArmed.label;guideArmed=null;button.classList.remove('tapArmed');fn();saveNarratorNotes();guideSignature='';renderNarratorGuide();button.classList.add('tapSaved')};}
-guideAction('guideBack',()=>narratorNotes.step--);guideAction('guideNext',()=>narratorNotes.step++);guideAction('guideNight',()=>{narratorNotes.night++;narratorNotes.step=0});guideAction('healToggle',()=>narratorNotes.healUsed=!narratorNotes.healUsed);guideAction('poisonToggle',()=>narratorNotes.poisonUsed=!narratorNotes.poisonUsed);
+function moveGuide(fn){if(guideArmed){const previous=$(guideArmed.id);previous.classList.remove('tapArmed');previous.textContent=guideArmed.label;guideArmed=null}fn();saveNarratorNotes();guideSignature='';renderNarratorGuide()}
+$('guideBack').onclick=()=>{if(!$('guideBack').disabled)moveGuide(()=>narratorNotes.step--)};
+$('guideNext').onclick=()=>{if(!$('guideNext').disabled)moveGuide(()=>narratorNotes.step++)};
+$('guideNight').onclick=()=>moveGuide(()=>{narratorNotes.night++;narratorNotes.step=0});guideAction('healToggle',()=>narratorNotes.healUsed=!narratorNotes.healUsed);guideAction('poisonToggle',()=>narratorNotes.poisonUsed=!narratorNotes.poisonUsed);
 
 function render(){if(!state)return;renderPrivateRoles();renderNarratorGuide();renderRoster();const active=alive(),roundActive=roundVoters(),done=(state.voted||[]).filter(n=>roundActive.includes(n)),who=$('voter').value;
 const isElection=state.captain_phase==='voting',isPending=state.captain_phase==='pending';
@@ -319,7 +322,7 @@ button.onclick=async()=>{
  data.armed=false;data.working=true;data.saved=false;armedButton=null;operationFailed=false;paintTwoTapButtons();
  try{await original();data.saved=!operationFailed}catch(e){message(e.message);data.saved=false}finally{data.working=false;setTapCaption(button,data,data.label);paintTwoTapButtons()}
 };}
-for(const id of ['choosePlayer','chooseNarrator','backToStart','setNarrator','close','tieConfirm','next','night','startCaptain','finishCaptain','confirmCaptainTie','setSuccessor','new','addPlayer','saveRoster'])wireTwoTap($(id),id);
+for(const id of ['setNarrator','close','tieConfirm','next','night','startCaptain','finishCaptain','confirmCaptainTie','setSuccessor','new','saveRoster'])wireTwoTap($(id),id);
 document.addEventListener('change',()=>{if(armedButton){const b=armedButton,data=buttonStates.get(b);data.armed=false;setTapCaption(b,data,data.label);armedButton=null;paintTwoTapButtons()}});
 
 refresh().catch(()=>{});setInterval(()=>refresh().catch(()=>{}),4000);
