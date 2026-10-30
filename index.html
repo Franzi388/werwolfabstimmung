@@ -110,13 +110,13 @@ const capWho=$('captainVoter').value;options($('captainVoter'),active,'Eigenen N
 $('captainChoices').replaceChildren();for(const n of sort(active)){const b=document.createElement('button');b.className='choice'+(captainChoice===n?' selected':'');b.textContent=(captainChoice===n?'✓ ':'')+n;b.disabled=!$('captainVoter').value||busy;b.onclick=()=>{captainChoice=n;render()};$('captainChoices').append(b)}
 $('castCaptain').disabled=!$('captainVoter').value||!captainChoice||busy;
 $('castCaptain').textContent=(state.captain_voted||[]).includes($('captainVoter').value)?'3. Stimme ändern':'3. Stimme abgeben';
-$('round').textContent='Runde '+(state.round_number||1);$('count').textContent=done.length+' / '+active.length;$('barFill').style.width=(active.length?done.length/active.length*100:0)+'%';$('remaining').textContent=state.closed?'Die Abstimmung ist abgeschlossen.':active.length===done.length?'Alle Stimmen sind abgegeben. Der Erzähler kann die Runde abschließen.':'Noch '+(active.length-done.length)+' '+(active.length-done.length===1?'Person muss':'Personen müssen')+' abstimmen.';
+$('round').textContent='Runde '+(state.round_number??state.round??1);$('count').textContent=done.length+' / '+active.length;$('barFill').style.width=(active.length?done.length/active.length*100:0)+'%';$('remaining').textContent=state.closed?'Die Abstimmung ist abgeschlossen.':active.length===done.length?'Alle Stimmen sind abgegeben. Der Erzähler kann die Runde abschließen.':'Noch '+(active.length-done.length)+' '+(active.length-done.length===1?'Person muss':'Personen müssen')+' abstimmen.';
 options($('voter'),active,'Eigenen Namen auswählen …',who);const selected=$('voter').value;if(!active.includes(choice)||choice===selected)choice='';$('choices').replaceChildren();for(const n of sort(active)){if(n===selected)continue;const b=document.createElement('button');b.className='choice'+(choice===n?' selected':'');b.textContent=(choice===n?'✓ ':'')+n;b.disabled=!selected||state.closed||busy;b.onclick=()=>{choice=n;render()};$('choices').append(b)}
 $('submit').disabled=!selected||!choice||state.closed||busy||!state.narrator;$('submit').textContent=done.includes(selected)?'3. Stimme ändern':'3. Stimme abgeben';$('voteHint').textContent=state.closed?'Diese Runde ist abgeschlossen.':!state.narrator?'Der Erzähler muss zuerst festgelegt werden.':done.includes(selected)?'Du kannst deine Stimme bis zum Rundenende noch ändern.':'Wähle eine Person aus und bestätige deine Stimme.';
 const published=!!(state.closed&&state.banished);$('published').classList.toggle('hidden',phase!=='done'||!published);$('waiting').classList.toggle('hidden',phase!=='done'||published);$('votePanel').classList.toggle('hidden',phase!=='done'||!!state.closed);if(published){$('banished').textContent=state.banished;const ballots=state.ballots||[];$('tallies').replaceChildren();$('ballots').replaceChildren();for(const n of sort(active.concat(state.banished).filter((x,i,a)=>a.indexOf(x)===i)))line($('tallies'),n,ballots.filter(b=>b.choice===n).length+' Stimmen');for(const b of ballots)line($('ballots'),b.voter,'→ '+b.choice)}
 {$('doneNames').textContent=sort(done).join('\n')||'Noch niemand';$('missingNames').textContent=sort(active.filter(n=>!done.includes(n))).join('\n')||'Alle fertig!';const nv=$('narratorSelect').value,night=$('nightSelect').value;options($('narratorSelect'),state.names,'Erzähler auswählen …',nv||state.narrator);options($('nightSelect'),active.filter(n=>n!==state.banished),'Spieler auswählen …',night);$('setNarrator').disabled=done.length>0||state.closed;$('close').disabled=phase!=='done'||state.closed||!state.narrator||done.length!==active.length||active.length<2;$('undo').disabled=!state.closed||!state.banished;$('next').disabled=!state.closed;$('night').disabled=phase!=='done'||!$('nightSelect').value;$('nightHelp').textContent=phase!=='done'?'Zuerst die Hauptmann-Wahl abschließen.':!$('nightSelect').value?'Bitte einen Namen auswählen.':'Du kannst das Ausscheiden bestätigen.';}
 }
-async function refresh(){try{const s=await rpc('ww_view_v8');if(lastRound!==null&&lastRound!==s.round){choice='';tieCandidates=[];$('tieArea').classList.add('hidden');$('feedback').textContent=''}lastRound=s.round;state=s;render();}catch(e){$('feedback').textContent='Verbindung fehlgeschlagen: '+e.message+' — Bitte zuerst die V8-SQL-Datei in Supabase ausführen.';$('feedback').className='status error'}}
+async function refresh(){try{const s=await rpc('ww_view_v8');if(!s||!Array.isArray(s.names))throw Error('Ungültige Datenbankantwort');if(lastRound!==null&&lastRound!==s.round){choice='';tieCandidates=[];$('tieArea').classList.add('hidden');$('feedback').textContent=''}lastRound=s.round;state=s;render();return s;}catch(e){$('feedback').textContent='Verbindung fehlgeschlagen: '+e.message;$('feedback').className='status error';throw e}}
 function message(t,ok=false){$('adminMsg').textContent=t;$('adminMsg').className='status '+(ok?'ok':'error')}
 async function action(a,p=null,n=null){try{const d=await rpc('ww_manage_v8',{p_action:a,p_person:p,p_names:n});if(!d.tie)message('Gespeichert.',true);await refresh();return d}catch(e){message(e.message);return null}}
 $('voter').onchange=()=>{choice='';render()};$('submit').onclick=async()=>{const who=$('voter').value;if(!who||!choice||busy)return;if(!confirm(who+' stimmt für '+choice+'. Stimme speichern?'))return;busy=true;try{await rpc('ww_cast',{p_voter:who,p_choice:choice});$('feedback').textContent='✓ Deine Stimme wurde gespeichert.';$('feedback').className='status ok';await refresh()}catch(e){$('feedback').textContent=e.message;$('feedback').className='status error'}finally{busy=false;render()}};
@@ -151,15 +151,22 @@ $('newYes').onclick=async()=>{
  $('newConfirmBox').classList.add('hidden');
  const btn=$('new');btn.disabled=true;message('Neues Spiel wird gestartet …',true);
  try{
-  const before=state?.game_number;
-  const d=await rpc('ww_new_game_v11');
-  if(!d||d.ok!==true)throw Error('Neustart wurde nicht bestätigt.');
-  choice='';captainChoice='';lastRound=null;
-  await refresh();
-  if(before!==undefined&&state?.game_number===before)throw Error('Die Datenbank hat das Spiel nicht gewechselt.');
-  if(state?.round_number!==undefined&&state?.round_number!==1)throw Error('Die sichtbare Rundennummer wurde nicht zurückgesetzt.');
-  if((state?.voted||[]).length>0)throw Error('Es sind noch alte Stimmen sichtbar.');
-  message('✓ Neues Spiel gestartet! Runde 1 · Alle Stimmen zurückgesetzt.',true);
+  const before=Number(state?.game_number??state?.game);
+  const d=await rpc('ww_new_game_v14');
+  if(!d||d.ok!==true)throw Error('Neustart wurde von Supabase nicht bestätigt.');
+  const s=await refresh();
+  const game=Number(s.game_number??s.game);
+  const round=Number(s.round_number??s.round);
+  if(!Number.isFinite(game)||!Number.isFinite(round))throw Error('Supabase liefert keine Spiel- oder Rundennummer. Bitte V14-SQL ausführen.');
+  if(Number.isFinite(before)&&game<=before)throw Error('Die Spielnummer wurde nicht erhöht.');
+  if(game!==Number(d.game_number))throw Error('Die Spielnummer stimmt nicht mit der Datenbankbestätigung überein.');
+  if(round!==1)throw Error('Die Runde wurde nicht auf 1 zurückgesetzt.');
+  if((s.voted||[]).length!==0)throw Error('Es sind noch Stimmen vorhanden.');
+  if((s.eliminated||[]).length!==0)throw Error('Es sind noch ausgeschiedene Spieler vorhanden.');
+  if(s.captain||s.captain_phase!=='pending')throw Error('Die Hauptmann-Wahl wurde nicht zurückgesetzt.');
+  choice='';captainChoice='';lastRound=null;rosterDirty=false;
+  render();
+  message('✓ Neues Spiel erfolgreich gestartet! Runde 1 · 0 Stimmen.',true);
  }catch(e){message('Neustart fehlgeschlagen: '+e.message);}
  finally{btn.disabled=false;}
 };
