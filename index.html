@@ -480,7 +480,7 @@ function showGameResult(){
  if(!gameResult||!state||gameResult.fingerprint!==gameEndFingerprint()){document.getElementById('gameEndModal')?.classList.add('hidden');return}
  if(!['player','narrator'].includes(currentArea))return;
  for(const id of ['votePanel','captainVotePanel','nightAnnouncement','captainAnnouncement'])$(id).classList.add('hidden');
- for(const id of ['next','close','guideNext','guideNight'])$(id).disabled=busy;
+ for(const id of ['next','close','guideNext','guideNight'])$(id).disabled=true;
  $('remaining').textContent='Spiel beendet';
  if(gameResultSeen.has(gameResult.id))return;
  let modal=document.getElementById('gameEndModal');
@@ -515,7 +515,7 @@ function renderPlayerIdentity(){
  if(identityOptionsKey!==key){options(select,names,'Deinen Namen auswählen …',playerIdentity);identityOptionsKey=key}
  select.disabled=busy;if(select.value!==playerIdentity)select.value=playerIdentity;
  $('identityStatus').textContent=playerIdentity?'Du spielst als '+playerIdentity+'. Ihr teilt ein Handy? Wähle für die nächste Stimme einfach den anderen Namen aus.':'Wähle deinen Namen. Du kannst die Auswahl jederzeit ändern.';
- for(const id of ['voter','captainVoter']){$(id).value=playerIdentity;$(id).disabled=true;}
+ for(const id of ['voter','captainVoter']){$(id).value=playerIdentity;$(id).disabled=busy;}
  if(!playerIdentity||state.eliminated.includes(playerIdentity)){for(const id of ['votePanel','captainVotePanel'])$(id).classList.add('hidden');if(playerIdentity)$('identityStatus').textContent=playerIdentity+' · Du bist ausgeschieden und kannst nicht mehr abstimmen. Falscher Name? Ändere ihn oben.';}
 }
 function identityOptions(select,names,selected){
@@ -552,7 +552,10 @@ function renderDrawControls(root){
  }
  if(used){const note=document.createElement('small');note.textContent=used+' vergeben · zum Entfernen erst die Zuordnung unten ändern';row.append(note)}config.append(row);
  }
- const total=roleChoices.reduce((sum,r)=>sum+roleLimit(r),0),balance=document.createElement('p');balance.className='status '+(total===names.length?'ok':'error');balance.setAttribute('aria-live','polite');balance.textContent=total+' Karten für '+names.length+' Mitspieler'+(total===names.length?' · ✓ Passt':total<names.length?' · Noch '+(names.length-total)+' Karten ergänzen':' · '+(total-names.length)+' Karten entfernen');config.append(balance);root.append(config);
+ const total=roleChoices.reduce((sum,r)=>sum+roleLimit(r),0),balance=document.createElement('p');balance.className='status '+(total===names.length?'ok':'error');balance.setAttribute('aria-live','polite');balance.textContent=total+' Karten für '+names.length+' Mitspieler'+(total===names.length?' · ✓ Passt':total<names.length?' · Noch '+(names.length-total)+' Karten ergänzen':' · '+(total-names.length)+' Karten entfernen');config.append(balance);
+ const remainingVillagers=names.length-roleChoices.filter(r=>r!=='Dorfbewohner').reduce((sum,r)=>sum+roleLimit(r),0);
+ if(remainingVillagers>=assignedRoleCount('Dorfbewohner')&&remainingVillagers!==roleLimit('Dorfbewohner')){const fill=document.createElement('button');fill.type='button';fill.className='secondary';fill.textContent='Übrige Karten als Dorfbewohner auffüllen ('+remainingVillagers+')';fill.onclick=()=>update('Dorfbewohner',remainingVillagers);config.append(fill)}
+ root.append(config);
  const progress=document.createElement('p');progress.className='roleCountProgress';const assigned=names.filter(n=>roleChoices.includes(privateRoles.roles[n])).length;progress.textContent=assigned+' von '+names.length+' Rollen eingetragen.';root.append(progress);
  for(const role of ['Werwolf','Dorfbewohner']){const limit=roleLimit(role);if(!Number.isInteger(limit))continue;const used=assignedRoleCount(role),note=document.createElement('p');note.className='small';note.textContent=role+': '+used+' von '+limit+' vergeben · '+(used>limit?(used-limit)+' zu viel':Math.max(0,limit-used)+' noch frei');root.append(note)}
  const heading=document.createElement('h3');heading.textContent='2. Gezogene Rollen eintragen';root.append(heading);
@@ -563,7 +566,7 @@ function renderDrawControls(root){
  select.onchange=()=>{if(select.value&&!roleAvailable(select.value,name)){select.value=privateRoles.roles[name]||'';return}if(select.value)privateRoles.roles[name]=select.value;else delete privateRoles.roles[name];persistPrivateRoles();roleSignature='';renderPrivateRoles();renderPlayerList();renderGameOverview();guideSignature='';renderNarratorGuide();};label.append(select);root.append(label);
  }
  $('guideNext').disabled=!rolesComplete();
- if(assigned===names.length&&!rolesComplete()){const warning=document.createElement('p');warning.className='status error';warning.textContent='Bitte die Rollenanzahl prüfen: Die vergebenen Rollen müssen zu den eingestellten Anzahlen passen.';root.append(warning)}
+ if(!rolesComplete()){const warning=document.createElement('p');warning.className='status error';warning.textContent=assigned<names.length?'Zum Weitergehen noch '+(names.length-assigned)+' Rollen unten eintragen.':'Alle Personen haben eine Rolle. Bitte oben die Kartenanzahl und die noch freien Rollen prüfen, damit sie zur Verteilung passen.';root.append(warning)}
 }
 let currentArea='start';
 
