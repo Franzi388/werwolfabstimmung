@@ -543,7 +543,7 @@ function renderDrawControls(root,planning=false){
  ensureRolePlan();
  if(planning){
  const config=document.createElement('section');config.className='roleCounts';config.setAttribute('aria-label','Rollen für diese Partie');
- const headingPlan=document.createElement('h3');headingPlan.textContent='1. Mit welchen Rollen spielt ihr?';config.append(headingPlan);
+
 
  const update=(role,value)=>{privateRoles.limits[role]=value;privateRoles.limits.Dorfbewohner=Math.max(0,names.length-roleChoices.filter(r=>r!=='Dorfbewohner').reduce((sum,r)=>sum+roleLimit(r),0));persistPrivateRoles(false);roleSignature='';guideSignature='';render()};
  for(const role of roleChoices){
