@@ -435,8 +435,9 @@ else if(active.length===2&&pair.length===2&&pair.every(n=>active.includes(n))&&w
 else if(wolves.length===0)title='🏡 Das Dorf hat gewonnen.';
 else if(village.length===0)title='🐺 Die Werwölfe haben gewonnen.';
 else if(wolves.length>=village.length){const mixed=pair.length===2&&pair.every(n=>active.includes(n))&&pair.some(n=>privateRoles.roles[n]==='Werwolf')&&pair.some(n=>privateRoles.roles[n]!=='Werwolf');title=mixed?'Das gemischte Liebespaar spielt noch um seinen gemeinsamen Sieg.':'🐺 Die Werwölfe haben gewonnen.';}
-const winner=title.includes('hat gewonnen')||title.includes('haben gewonnen')?title:null;return {title,winner,missing,wolves,village,broken,hunters};}
+const winner=title.includes('hat gewonnen')||title.includes('haben gewonnen')||title==='Alle sind ausgeschieden – kein überlebender Sieger.'?title:null;return {title,winner,missing,wolves,village,broken,hunters};}
 function gameVictoryDetail(result){
+ if(result.title==='Alle sind ausgeschieden – kein überlebender Sieger.')return 'Niemand hat überlebt. Diese Partie endet ohne Sieger.';
  if(result.title.includes('Das Dorf hat gewonnen')){
   const wolves=state.names.filter(n=>n!==state.narrator&&privateRoles.roles[n]==='Werwolf');
   if(wolves.length===1)return wolves[0]+' war ein Werwolf. Ihr habt euren Werwolf gefunden!';
