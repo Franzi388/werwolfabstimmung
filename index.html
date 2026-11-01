@@ -282,7 +282,7 @@ renderNightInputs(step);
  renderOpenVoteNames();syncPublicPhase();
 }
 function moveGuide(fn){if($('guideActionStatus'))$('guideActionStatus').textContent='';if(guideArmed){const previous=$(guideArmed.id);previous.classList.remove('tapArmed');previous.textContent=guideArmed.label;guideArmed=null}narratorNotes.anchor='';fn();saveNarratorNotes();guideSignature='';renderNarratorGuide()}
-$('guideBack').onclick=()=>{if(narratorNotes.step===0){$('rosterChecks').closest('details').open=true;$('rosterChecks').scrollIntoView({block:'start',behavior:'smooth'});return}moveGuide(()=>narratorNotes.step--)};
+$('guideBack').onclick=()=>{if(narratorNotes.step===0){openPreparationStep(state.narrator?prepPlayers:prepNarrator);return}moveGuide(()=>narratorNotes.step--)};
 $('guideNext').onclick=()=>{if($('guideNext').disabled)return;const title=$('guideTitle').textContent;if(title==='Nacht beginnt'){beginNextNarratorNight();return}if(title==='Verbannung'){thisNight().dayRevealConfirmed=true;saveNarratorNotes(false)}if(title==='Das Dorf erwacht'){thisNight().nightRevealConfirmed=true;saveNarratorNotes(false)}if($('guideTitle').textContent==='Hexe'){thisNight().witchComplete=true;saveNarratorNotes(false)}moveGuide(()=>narratorNotes.step++)};
 $('guideNight').onclick=beginNextNarratorNight;
 
@@ -631,7 +631,7 @@ function renderDrawControls(root,planning=false){
  root.append(config);
  const valid=!!state.narrator&&names.length>0&&roleLimit('Werwolf')>=1&&total===names.length&&roleChoices.every(r=>assignedRoleCount(r)<=roleLimit(r));
  $('guideNext').disabled=!valid;
- if(!state.narrator){const note=document.createElement('p');note.textContent='Bitte zuerst den Erzähler in der Vorbereitung festlegen.';root.append(note)}
+ if(!state.narrator){const note=document.createElement('p');note.textContent='Bitte zuerst den Erzähler festlegen. Er bekommt keine Rollenkarte.';root.append(note);const go=document.createElement('button');go.type='button';go.className='primary';go.textContent='Erzähler festlegen';go.onclick=()=>openPreparationStep(prepNarrator);root.append(go)}
  if(roleLimit('Werwolf')<1){const note=document.createElement('p');note.textContent='Mindestens einen Werwolf auswählen.';root.append(note)}
  if(roleChoices.some(r=>assignedRoleCount(r)>roleLimit(r))){const note=document.createElement('p');note.textContent='Die neue Zusammenstellung passt nicht zu bereits vergebenen Rollen. Bitte die Anzahl korrigieren oder die Zuordnung im nächsten Schritt zurücknehmen.';root.append(note);const edit=document.createElement('button');edit.type='button';edit.textContent='Zuordnungen korrigieren';edit.onclick=()=>setGuideStep('Rollenvergabe');root.append(edit)}
  return;
