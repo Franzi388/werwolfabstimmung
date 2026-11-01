@@ -429,11 +429,11 @@ $('finishCaptain').disabled=!(state.captain_voted||[]).length||((state.captain_v
 $('captainStatus').textContent=phase==='pending'?'Noch keine Hauptmann-Wahl. Erzähler festlegen und Wahl starten.':election?'Hauptmann-Wahl: '+(state.captain_voted||[]).length+' von '+active.length+' Stimmen · '+(active.length-(state.captain_voted||[]).length)+' fehlen.':'Aktueller Hauptmann: '+(state.captain||'noch keiner');
 $('successorBox').classList.toggle('hidden',phase!=='done');
 const successorOld=$('successor').value;options($('successor'),active,'Nachfolger auswählen …',successorOld);
-const capWho=playerIdentity||$('captainVoter').value;options($('captainVoter'),active,'Eigenen Namen auswählen …',capWho);
+const capWho=playerIdentity||$('captainVoter').value;identityOptions($('captainVoter'),active,capWho);
 const capSelected=$('captainVoter').value;const capSaved=savedCaptainVotes[capSelected];
 $('captainChoices').replaceChildren();for(const n of sort(active)){const saved=(state.captain_voted||[]).includes(capSelected)&&capSaved===n,armed=captainChoice===n;const b=document.createElement('button');b.type='button';b.className='choice'+(armed?' selected':'')+(saved?' saved':'');b.setAttribute('aria-pressed',String(armed||saved));const title=document.createElement('strong');title.textContent=(saved?'✓ ':'')+n;const help=document.createElement('small');help.textContent=busy&&armed?'Wird gespeichert …':saved&&!armed?'Stimme abgegeben':armed?'Noch einmal hier tippen zum Bestätigen':'Zum Auswählen tippen';b.append(title,help);b.disabled=!capSelected||busy||!election;b.onclick=()=>{if(busy)return;if(captainChoice===n)return submitCaptainVote();captainChoice=n;render()};$('captainChoices').append(b)}
 $('round').textContent=phase==='pending'?'Gleich geht’s los':election?'Hauptmann-Wahl · Runde 1':'Runde '+(state.round_number??state.round??1);$('count').textContent=isPending?'—':progressDone.length+' / '+progressNames.length;$('barFill').style.width=(!isPending&&progressNames.length?progressDone.length/progressNames.length*100:0)+'%';$('remaining').textContent=isPending?'Gleich wählt das Dorf seinen Hauptmann. Sobald der Erzähler die Wahl freigibt, geht’s los.':state.closed?'Die Dorfabstimmung ist abgeschlossen.':progressNames.length===progressDone.length?(isElection?'Alle Stimmen sind abgegeben. Der Erzähler kann die Hauptmann-Wahl abschließen.':'Alle Stimmen sind abgegeben. Der Erzähler kann die Runde abschließen.'):'Noch '+(progressNames.length-progressDone.length)+' '+(progressNames.length-progressDone.length===1?'Person muss':'Personen müssen')+' abstimmen.';
-options($('voter'),active,'Deinen Namen auswählen …',who);const selected=$('voter').value;if(!active.includes(choice)||choice===selected)choice='';
+identityOptions($('voter'),active,who);const selected=$('voter').value;if(!active.includes(choice)||choice===selected)choice='';
 const savedChoice=savedVotes[selected],hasSaved=done.includes(selected)&&!!savedChoice;
 $('choices').replaceChildren();for(const n of sort(active)){if(n===selected)continue;const saved=hasSaved&&savedChoice===n;const armed=choice===n;const b=document.createElement('button');b.type='button';b.className='choice'+(armed?' selected':'')+(saved?' saved':'');b.setAttribute('aria-pressed',String(armed||saved));
 const title=document.createElement('strong');title.textContent=(saved?'✓ ':'')+n;const help=document.createElement('small');help.textContent=busy&&armed?'Wird gespeichert …':saved&&!armed?'Stimme abgegeben':armed?'Noch einmal hier tippen zum Bestätigen':'Zum Auswählen tippen';b.append(title,help);
@@ -452,7 +452,7 @@ async function refresh(){try{const s=await rpc('ww_view_v8');if(!s||!Array.isArr
 function message(t,ok=false){if(!ok)operationFailed=true;$('adminMsg').textContent=t;$('adminMsg').className='status '+(ok?'ok':'error')}
 async function resolveLoverDeaths(){const pair=privateRoles.pair.filter(n=>state.names.includes(n)&&n!==state.narrator);if(pair.length!==2||!pair.some(n=>state.eliminated.includes(n)))return;for(const name of pair){if(state.eliminated.includes(name))continue;await rpc('ww_manage_v8',{p_action:'night',p_person:name,p_names:null});await refresh();if(!state.eliminated.includes(name))throw Error('Der verliebte Partner konnte noch nicht als ausgeschieden gespeichert werden. Bitte unter Folgeentscheidungen erneut bestätigen.');const a=thisNight();a.partnerDeaths=[...new Set([...(a.partnerDeaths||[]),name])];if(!state.closed)a.confirmed=[...new Set([...(a.confirmed||[]),name])];saveNarratorNotes(false)}}
 async function action(a,p=null,n=null){if(a==='captain_start'&&!rolesComplete()){message('Bitte zuerst alle Rollen vollständig und ohne doppelte Sonderrollen eintragen.');return null}if(['next','close','captain_start','captain_finish'].includes(a)&&finishedGame()){message('Die Partie ist beendet. Bitte ein neues Spiel starten.');return null}gameActionBusy++;try{const d=await rpc('ww_manage_v8',{p_action:a,p_person:p,p_names:n});if(!d.tie)message('Gespeichert.',true);await refresh();if((a==='night'||a==='close')&&!d.tie){await resolveLoverDeaths();guideSignature='';renderNarratorGuide()}return d}catch(e){operationFailed=true;message(e.message);return null}finally{gameActionBusy--;guideSignature='';renderNarratorGuide();syncGameEnd()}}
-$('voter').onchange=()=>{choice='';$('feedback').textContent='';render()};
+
 async function submitVillageVote(){const who=$('voter').value,target=choice,game=state?.game_number,round=state?.round;if(!who||!target||busy||state.closed||state.captain_phase!=='done')return;
 busy=true;$('feedback').textContent='';render();try{await rpc('ww_cast',{p_voter:who,p_choice:target});if(state.game_number===game&&state.round===round){savedVotes[who]=target;state.voted=[...new Set([...(state.voted||[]),who])];choice='';$('feedback').textContent='✓ '+who+': Deine Stimme für '+target+' wurde gespeichert.';$('feedback').className='status ok';}
 try{await refresh()}catch{ $('feedback').textContent='✓ Stimme abgegeben. Der aktuelle Spielstand konnte noch nicht neu geladen werden.';$('feedback').className='status ok';}
@@ -480,7 +480,7 @@ function showGameResult(){
  if(!gameResult||!state||gameResult.fingerprint!==gameEndFingerprint()){document.getElementById('gameEndModal')?.classList.add('hidden');return}
  if(!['player','narrator'].includes(currentArea))return;
  for(const id of ['votePanel','captainVotePanel','nightAnnouncement','captainAnnouncement'])$(id).classList.add('hidden');
- for(const id of ['next','close','guideNext','guideNight'])$(id).disabled=true;
+ for(const id of ['next','close','guideNext','guideNight'])$(id).disabled=busy;
  $('remaining').textContent='Spiel beendet';
  if(gameResultSeen.has(gameResult.id))return;
  let modal=document.getElementById('gameEndModal');
@@ -513,20 +513,27 @@ function renderPlayerIdentity(){
  const select=$('playerIdentity'),key=JSON.stringify(names);
  // Leave the native phone picker intact during automatic refreshes.
  if(identityOptionsKey!==key){options(select,names,'Deinen Namen auswählen …',playerIdentity);identityOptionsKey=key}
- select.disabled=false;if(select.value!==playerIdentity)select.value=playerIdentity;
- $('identityStatus').textContent=playerIdentity?'Du spielst als '+playerIdentity+'. Dein Name bleibt gespeichert. Falsch gewählt? Du kannst ihn jederzeit oben ändern.':'Wähle deinen Namen. Du kannst die Auswahl jederzeit ändern.';
+ select.disabled=busy;if(select.value!==playerIdentity)select.value=playerIdentity;
+ $('identityStatus').textContent=playerIdentity?'Du spielst als '+playerIdentity+'. Ihr teilt ein Handy? Wähle für die nächste Stimme einfach den anderen Namen aus.':'Wähle deinen Namen. Du kannst die Auswahl jederzeit ändern.';
  for(const id of ['voter','captainVoter']){$(id).value=playerIdentity;$(id).disabled=true;}
  if(!playerIdentity||state.eliminated.includes(playerIdentity)){for(const id of ['votePanel','captainVotePanel'])$(id).classList.add('hidden');if(playerIdentity)$('identityStatus').textContent=playerIdentity+' · Du bist ausgeschieden und kannst nicht mehr abstimmen. Falscher Name? Ändere ihn oben.';}
 }
-$('playerIdentity').onchange=()=>{
- const selected=$('playerIdentity').value;
+function identityOptions(select,names,selected){
+ if(!select.dataset.sharingHint){const hint=document.createElement('p');hint.className='muted small';hint.textContent='Ein Handy für mehrere? Hier den eigenen Namen wechseln und die nächste Stimme abgeben.';select.after(hint);select.dataset.sharingHint='true'}
+ const key=JSON.stringify(names);
+ if(select.dataset.identityNames!==key){options(select,names,'Deinen Namen auswählen …',selected);select.dataset.identityNames=key}
+ if(select.value!==selected)select.value=selected;
+}
+function switchPlayerIdentity(selected){
+ if(busy){renderPlayerIdentity();return}
  if(!state||!state.names.includes(selected)||selected===state.narrator){renderPlayerIdentity();return}
  playerIdentity=selected;
  try{localStorage.setItem('werwolf_player_identity_v1',JSON.stringify({game:roleGameId(),name:playerIdentity}))}catch{}
- // An armed vote must never follow a change of person.
- $('voter').value=playerIdentity;$('captainVoter').value=playerIdentity;choice='';captainChoice='';
+ for(const id of ['playerIdentity','voter','captainVoter'])$(id).value=playerIdentity;
+ choice='';captainChoice='';
  $('feedback').textContent='';$('captainFeedback').textContent='';render();
-};
+}
+for(const id of ['playerIdentity','voter','captainVoter'])$(id).onchange=()=>switchPlayerIdentity($(id).value);
 function renderDrawControls(root){
  const names=state.names.filter(n=>n!==state.narrator);
  ensureRolePlan();
@@ -623,7 +630,7 @@ $('backToStart').onclick=()=>showArea('start');
 $('setNarrator').onclick=()=>{const p=$('narratorSelect').value;if(p&&true)return action('narrator',p)};
 $('close').onclick=async()=>{if(!true)return;const d=await action('close');if(d?.tie){tieCandidates=d.candidates;$('tieArea').classList.remove('hidden');$('tieText').textContent='Gleichstand! Hauptmann '+d.captain+' entscheidet.';options($('tieSelect'),tieCandidates,'Person auswählen …')}else if(d?.banished){$('tieArea').classList.add('hidden');message(d.banished+' wurde verbannt.',true)}};
 $('tieConfirm').onclick=async()=>{const p=$('tieSelect').value;if(!p||!tieCandidates.includes(p))return;if(true){const d=await action('close',p);if(d?.banished){$('tieArea').classList.add('hidden');message(p+' wurde verbannt.',true)}}};
-$('next').onclick=beginNextNarratorNight;$('nightSelect').onchange=()=>{lastNight='';if(state)render()};$('night').onclick=async()=>{const p=$('nightSelect').value;if(!p||nightBusy)return;if(!true)return;nightBusy=true;render();try{const result=await action('night',p);if(result&&state.eliminated.includes(p))lastNight=p;}finally{nightBusy=false;render()}};$('captainVoter').onchange=()=>{captainChoice='';$('captainFeedback').textContent='';render()};
+$('next').onclick=beginNextNarratorNight;$('nightSelect').onchange=()=>{lastNight='';if(state)render()};$('night').onclick=async()=>{const p=$('nightSelect').value;if(!p||nightBusy)return;if(!true)return;nightBusy=true;render();try{const result=await action('night',p);if(result&&state.eliminated.includes(p))lastNight=p;}finally{nightBusy=false;render()}};
 async function submitCaptainVote(){const who=$('captainVoter').value,target=captainChoice,game=state?.game_number;if(!who||!target||busy||state.captain_phase!=='voting')return;busy=true;render();try{await rpc('ww_captain_cast_v8',{p_voter:who,p_choice:target});if(state.game_number===game&&state.captain_phase==='voting'){savedCaptainVotes[who]=target;state.captain_voted=[...new Set([...(state.captain_voted||[]),who])];captainChoice='';$('captainFeedback').textContent='✓ '+who+': Stimme für '+target+' abgegeben.';$('captainFeedback').className='status ok';}try{await refresh()}catch{$('captainFeedback').textContent='✓ Stimme abgegeben. Der Spielstand konnte noch nicht neu geladen werden.';}}catch(e){operationFailed=true;$('captainFeedback').textContent='Stimme nicht gespeichert: '+e.message;$('captainFeedback').className='status error';}finally{busy=false;render()}}
 
 $('startCaptain').onclick=()=>{if(true)return action('captain_start')};
