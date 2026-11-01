@@ -641,6 +641,13 @@ function renderDrawControls(root,planning=false){
 let currentArea='start';
 
 let publicPhase=null,publicPhaseBusy=false,lastPublicPhaseKey='',lastPublicPhaseSend=0;
+const resultNightTransitions=new Set();
+function followNarratorIntoNight(){
+ if(!['player','narrator'].includes(currentArea)||(currentArea==='player'&&!identityConfirmed))return;
+ const key=JSON.stringify([currentArea,roleGameId(),state.round]);if(resultNightTransitions.has(key))return;resultNightTransitions.add(key);
+ if(!resultModal.classList.contains('hidden')&&voteModalArea===currentArea)closeVoteResult();
+ $('captainAnnouncement').classList.add('hidden');
+}
 function renderPublicPhase(){
  if(!state||!$('playerSleepNotice'))return;
  const day=publicPhase?.game===roleGameId()&&publicPhase.round===state.round&&publicPhase.phase==='day';
@@ -651,7 +658,7 @@ function renderPublicPhase(){
  $('playerSleepNotice').querySelector('h2').textContent=showDay?'🔥 Die Diskussion beginnt.':'🌙 Das Dorf schläft ein.';
  $('playerSleepNotice').querySelector('p').textContent=showDay?'Wer könnte ein Werwolf sein? Tauscht euren Verdacht aus.':'Schließt die Augen und hört auf den Erzähler.';
  setVillageScene($('playerVillageScene'),sleeping?'night':showDay?'day':null);
- if(sleeping){$('votePanel').classList.add('hidden');$('waiting').classList.add('hidden')}
+ if(sleeping){followNarratorIntoNight();$('votePanel').classList.add('hidden');$('waiting').classList.add('hidden')}
  else if(day&&state.captain_phase==='done'&&!state.closed&&playerIdentity&&!state.eliminated.includes(playerIdentity))$('votePanel').classList.remove('hidden');
 }
 function syncPublicPhase(){
@@ -866,7 +873,7 @@ for(const [screen,id] of [['narratorScreen','narratorVoteHistory'],['playerScree
  const panel=document.createElement('details');panel.id=id;panel.className='panel voteHistory';const summary=document.createElement('summary');summary.textContent='Abstimmungsergebnisse';panel.append(summary);const body=document.createElement('div');body.className='voteHistoryBody';panel.append(body);if(screen==='narratorScreen')$('narratorReference').insertBefore(panel,$('publicGameRules'));else $(screen).append(panel);
 }
 const resultModal=document.createElement('div');resultModal.id='voteResultModal';resultModal.className='hidden';resultModal.setAttribute('role','dialog');resultModal.setAttribute('aria-modal','true');resultModal.setAttribute('aria-labelledby','voteResultTitle');
-resultModal.innerHTML='<section class="voteResultCard"><h2 id="voteResultTitle"></h2><p id="voteResultBanished"></p><div id="voteResultDetails"><h3>Stimmenübersicht</h3><div id="voteResultTallies"></div><details open><summary>Wer hat wen gewählt?</summary><div id="voteResultBallots"></div></details><p class="muted small">Schau dir das Ergebnis in Ruhe an. Erst mit Weiter schließt du es auf deinem Gerät. Unter „Abstimmungsergebnisse“ bleibt es abrufbar.</p></div><button class="primary" id="voteResultClose" type="button">Weiter</button></section>';
+resultModal.innerHTML='<section class="voteResultCard"><h2 id="voteResultTitle"></h2><p id="voteResultBanished"></p><div id="voteResultDetails"><h3>Stimmenübersicht</h3><div id="voteResultTallies"></div><details open><summary>Wer hat wen gewählt?</summary><div id="voteResultBallots"></div></details><p class="muted small">Schau dir das Ergebnis in Ruhe an. Mit Weiter schließt du es. Wenn der Erzähler die nächste Nacht startet, erscheint automatisch das Schlafbild. Unter „Abstimmungsergebnisse“ bleiben alle Runden abrufbar.</p></div><button class="primary" id="voteResultClose" type="button">Weiter</button></section>';
 document.body.append(resultModal);
 function validVoteResult(v){return !!v&&v.type==='vote_result'&&typeof v.game==='string'&&v.game.length<100&&Number.isInteger(v.round)&&v.round>0&&v.id===v.game+'-vote-'+v.round&&typeof v.banished==='string'&&v.banished.length<=60&&Array.isArray(v.names)&&v.names.length<=100&&v.names.every(n=>typeof n==='string'&&n.length<=60)&&Array.isArray(v.ballots)&&v.ballots.length<=100&&v.ballots.every(b=>b&&v.names.includes(b.voter)&&v.names.includes(b.choice))}
 function storeVoteArchive(){try{localStorage.setItem(voteArchiveKey,JSON.stringify(voteArchive))}catch{}}
@@ -877,7 +884,7 @@ function showVoteResult(v){voteResultStage='announcement';$('voteResultDetails')
 function closeVoteResult(){voteSeen.add(voteModalArea+':'+voteModalId);try{sessionStorage.setItem('werwolf_vote_seen_'+voteModalArea+':'+voteModalId,'yes')}catch{}resultModal.classList.add('hidden')}
 $('voteResultClose').onclick=()=>{if(voteResultStage==='announcement'){voteResultStage='details';$('voteResultDetails').classList.remove('hidden');$('voteResultBanished').classList.remove('banishmentAnnouncement');$('voteResultClose').closest('section').scrollTop=0;$('voteResultClose').focus();return}closeVoteResult()};
 resultModal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeVoteResult()}if(e.key==='Tab'){const controls=[...resultModal.querySelectorAll('summary,button')];const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
-function renderVoteHistory(){if(!state)return;const entries=voteArchive.filter(v=>v.game===roleGameId()).sort((a,b)=>b.round-a.round);for(const id of ['narratorVoteHistory','playerVoteHistory']){const body=$(id).querySelector('.voteHistoryBody');body.replaceChildren();if(!entries.length){const p=document.createElement('p');p.textContent='Noch keine abgeschlossene Dorfabstimmung in dieser Partie.';body.append(p)}for(const v of entries){const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent='Runde '+v.round+' · '+v.banished+' verbannt';b.onclick=()=>showVoteResult(v);body.append(b)}}if(!['player','narrator'].includes(currentArea)){resultModal.classList.add('hidden');return}if(!resultModal.classList.contains('hidden')){if(voteModalArea!==currentArea)resultModal.classList.add('hidden');else return}const latest=entries[0];if(!latest||(currentArea==='player'&&!identityConfirmed))return;const key=currentArea+':'+latest.id;let seen=voteSeen.has(key);try{seen=seen||sessionStorage.getItem('werwolf_vote_seen_'+key)==='yes'}catch{}if(!seen)showVoteResult(latest)}
+function renderVoteHistory(){if(!state)return;const entries=voteArchive.filter(v=>v.game===roleGameId()).sort((a,b)=>b.round-a.round);for(const id of ['narratorVoteHistory','playerVoteHistory']){const body=$(id).querySelector('.voteHistoryBody');body.replaceChildren();if(!entries.length){const p=document.createElement('p');p.textContent='Noch keine abgeschlossene Dorfabstimmung in dieser Partie.';body.append(p)}for(const v of entries){const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent='Runde '+v.round+' · '+v.banished+' verbannt';b.onclick=()=>showVoteResult(v);body.append(b)}}if(!['player','narrator'].includes(currentArea)){resultModal.classList.add('hidden');return}if(!resultModal.classList.contains('hidden')){if(voteModalArea!==currentArea)resultModal.classList.add('hidden');else return}const latest=entries[0];if(!latest||latest.round<Number(state.round_number??state.round)||(currentArea==='player'&&!identityConfirmed))return;const key=currentArea+':'+latest.id;let seen=voteSeen.has(key);try{seen=seen||sessionStorage.getItem('werwolf_vote_seen_'+key)==='yes'}catch{}if(!seen)showVoteResult(latest)}
 // The narrator periodically shares saved public results, including with reconnecting devices.
 setInterval(()=>{if(currentArea!=='narrator'||!state||Date.now()-lastVoteArchiveBroadcast<12000)return;lastVoteArchiveBroadcast=Date.now();for(const v of voteArchive.filter(v=>v.game===roleGameId()))sendNightNotice(v).catch(()=>{});},15000);
 
