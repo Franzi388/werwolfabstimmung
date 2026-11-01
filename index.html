@@ -243,6 +243,14 @@ function ensureRolePlan(){
  if(!rolesLocked()||!Number.isInteger(privateRoles.limits.Dorfbewohner))privateRoles.limits.Dorfbewohner=Math.max(0,count-roleChoices.filter(r=>r!=='Dorfbewohner').reduce((sum,r)=>sum+privateRoles.limits[r],0));
 }
 function roleLimit(role){return privateRoles.limits?.[role]??(roleChoices.slice(2).includes(role)?1:undefined)}
+function rolePlanCanSet(role,value){
+ if(rolesLocked()||!Number.isInteger(value)||value<0||role==='Dorfbewohner'||!roleChoices.includes(role))return false;
+ if(role==='Werwolf'&&value<Math.max(1,assignedRoleCount(role)))return false;
+ if(roleChoices.slice(2).includes(role)&&value>1)return false;
+ const previous=roleLimit(role),count=state.names.filter(n=>n!==state.narrator).length;
+ const needed=roleChoices.filter(r=>r!=='Dorfbewohner').reduce((sum,r)=>sum+(r===role?value:roleLimit(r)),0);
+ return value<=previous||needed<=count;
+}
 function roleAvailable(role,name){const limit=roleLimit(role);return !Number.isInteger(limit)||assignedRoleCount(role,name)<limit}
 function rolesComplete(){const names=state.names.filter(n=>n!==state.narrator);return !!state.narrator&&names.length>0&&roleChoices.every(role=>Number.isInteger(roleLimit(role))&&assignedRoleCount(role)===roleLimit(role))&&names.every(n=>roleChoices.includes(privateRoles.roles[n])&&roleAvailable(privateRoles.roles[n],n))}
 function addRoleOptions(select,name){for(const role of roleChoices){const limit=roleLimit(role),option=new Option(role+(Number.isInteger(limit)?' ('+Math.max(0,limit-assignedRoleCount(role,name))+' verfügbar)':''),role);option.disabled=privateRoles.roles[name]!==role&&!roleAvailable(role,name);option.selected=privateRoles.roles[name]===role;select.add(option)}}
@@ -602,7 +610,7 @@ function renderDrawControls(root,planning=false){
  const config=document.createElement('section');config.className='roleCounts';config.setAttribute('aria-label','Rollen für diese Partie');
 
 
- const update=(role,value)=>{privateRoles.limits[role]=value;privateRoles.limits.Dorfbewohner=Math.max(0,names.length-roleChoices.filter(r=>r!=='Dorfbewohner').reduce((sum,r)=>sum+roleLimit(r),0));persistPrivateRoles(false);roleSignature='';guideSignature='';render()};
+ const update=(role,value)=>{if(!rolePlanCanSet(role,value))return;privateRoles.limits[role]=value;privateRoles.limits.Dorfbewohner=Math.max(0,names.length-roleChoices.filter(r=>r!=='Dorfbewohner').reduce((sum,r)=>sum+roleLimit(r),0));persistPrivateRoles(false);roleSignature='';guideSignature='';render()};
  for(const role of roleChoices){
  const row=document.createElement('div');row.className='rolePlanRow';const title=document.createElement('strong');title.textContent=role==='Werwolf'?'Werwölfe':role==='Dorfbewohner'?'Dorfbewohner':role;const roleLabel=document.createElement('div');roleLabel.className='rolePlanLabel';
  if(seerCards[role]){const icon=document.createElement('img');icon.className='rolePlanIcon';icon.src=seerCards[role];icon.alt='';roleLabel.append(icon)}else{const icon=document.createElement('span');icon.className='rolePlanIcon rolePlanSymbol';icon.textContent='🔮';icon.setAttribute('aria-hidden','true');roleLabel.append(icon)}
@@ -610,15 +618,16 @@ function renderDrawControls(root,planning=false){
  const used=assignedRoleCount(role),limit=roleLimit(role);
  if(role==='Dorfbewohner'){const controls=document.createElement('div');controls.className='roleStepper roleAutoCount';for(const delta of [-1,0,1]){const el=document.createElement('span');if(delta){el.className='stepperSpacer';el.setAttribute('aria-hidden','true')}else{el.textContent=String(limit);el.setAttribute('aria-label',limit+' Dorfbewohner')}controls.append(el)}row.append(controls)}else if(roleChoices.slice(2).includes(role)){
  const group=document.createElement('div');group.className='rolePresence';group.setAttribute('role','group');group.setAttribute('aria-label',role);
- for(const enabled of [true,false]){const button=document.createElement('button');button.type='button';button.className='rolePresenceButton '+(enabled?'roleYes':'roleNo');button.textContent=enabled?'✓ Dabei':'✕ Ohne';button.setAttribute('aria-pressed',String(Boolean(limit)===enabled));button.setAttribute('aria-label',role+': '+(enabled?'Dabei':'Ohne'));button.onclick=()=>{if(Boolean(limit)===enabled)return;if(!enabled){for(const name of names)if(privateRoles.roles[name]===role)delete privateRoles.roles[name];if(role==='Amor')privateRoles.pair=['','']}update(role,enabled?1:0)};group.append(button)}row.append(group);
+ for(const enabled of [true,false]){const button=document.createElement('button');button.type='button';button.className='rolePresenceButton '+(enabled?'roleYes':'roleNo');button.textContent=enabled?'✓ Dabei':'✕ Ohne';button.setAttribute('aria-pressed',String(Boolean(limit)===enabled));button.setAttribute('aria-label',role+': '+(enabled?'Dabei':'Ohne'));button.disabled=Boolean(limit)!==enabled&&!rolePlanCanSet(role,enabled?1:0);button.onclick=()=>{if(Boolean(limit)===enabled||!rolePlanCanSet(role,enabled?1:0))return;if(!enabled){for(const name of names)if(privateRoles.roles[name]===role)delete privateRoles.roles[name];if(role==='Amor')privateRoles.pair=['','']}update(role,enabled?1:0)};group.append(button)}row.append(group);
 
  }else{
  const controls=document.createElement('div');controls.className='roleStepper';
- for(const delta of [-1,0,1]){const el=document.createElement(delta?'button':'span');if(delta){el.type='button';el.textContent=delta<0?'−':'+';el.setAttribute('aria-label',role+(delta<0?' verringern':' erhöhen'));el.disabled=delta<0?limit<=used:limit>=names.length;el.onclick=()=>update(role,limit+delta)}else{el.textContent=String(limit);el.setAttribute('aria-label',limit+' '+role)}controls.append(el)}row.append(controls);
+ for(const delta of [-1,0,1]){const el=document.createElement(delta?'button':'span');if(delta){el.type='button';el.textContent=delta<0?'−':'+';el.setAttribute('aria-label',role+(delta<0?' verringern':' erhöhen'));el.disabled=!rolePlanCanSet(role,limit+delta);el.onclick=()=>update(role,limit+delta)}else{el.textContent=String(limit);el.setAttribute('aria-label',limit+' '+role)}controls.append(el)}row.append(controls);
  }
  if(used){const note=document.createElement('small');note.textContent=used+' vergeben';row.append(note)}config.append(row);
  }
  const total=roleChoices.reduce((sum,r)=>sum+roleLimit(r),0),balance=document.createElement('p');balance.className='status '+(total===names.length?'ok':'error');balance.setAttribute('aria-live','polite');balance.textContent=total+' Karten für '+names.length+' Mitspieler'+(total===names.length?' · ✓ Passt':total<names.length?' · Noch '+(names.length-total)+' Karten ergänzen':' · '+(total-names.length)+' Karten entfernen');config.append(balance);
+ if(roleLimit('Dorfbewohner')===0&&total===names.length){const full=document.createElement('p');full.className='small';full.textContent='Alle Kartenplätze sind belegt. Für eine weitere Rolle zuerst eine andere Rolle herausnehmen oder die Werwolfzahl verringern.';config.append(full)}
  root.append(config);
  const valid=!!state.narrator&&names.length>0&&roleLimit('Werwolf')>=1&&total===names.length&&roleChoices.every(r=>assignedRoleCount(r)<=roleLimit(r));
  $('guideNext').disabled=!valid;
