@@ -1,6 +1,6 @@
 {
-  "name": "Werwölfe von Düsterwald",
-  "short_name": "Düsterwald",
+  "name": "Werwolf",
+  "short_name": "Werwolf",
   "description": "Werwolf-Abstimmung für Spieler und Erzähler",
   "start_url": "./",
   "scope": "./",
